@@ -1,12 +1,13 @@
 # My robotics-pet project
 # Управление
-Управление роботом производится мобильного устройства  посредством использования гироскопа (в текущей реализации телефон на Android (Redmi 9))
+Управление роботом производится мобильного устройства  посредством использования гироскопа (в текущей реализации телефон на Android (Redmi 9))  
 
+Ввиду технических особенностей джойстика (данные с потенциометров по осям X и Y могут принимать значения от 0 до 1023), необходимо производить корреляцию данных с гироскопа мобильного устройства (значения от -1 до 1)
 ```csharp 
 Vector2 GyroscopeToJoystickConversion(Vector2 gyroPos) {
     // x from -1.0 - 0.5 - 1.0
     // X from 0 - 511 - 1023
-    const float joyZeroEmulation = 511.0f; 
+    const float joyZeroEmulation = 511.5f; 
 
     var x = joyZeroEmulation * gyroPos.X + (gyroPos.X > 0 ? gyroPos.X : -gyroPos.X);
     var y = joyZeroEmulation * gyroPos.Y + (gyroPos.Y > 0 ? gyroPos.Y : -gyroPos.Y);
@@ -23,25 +24,11 @@ ___
 
 ![Communication scheme](./images/communication.png)
 
-```csharp
-subscriberSocket = new SubscriberSocket();
-subscriberSocket.Connect(addr);
-
-netMQPoller = new NetMQPoller
-          {
-              subscriberSocket
-          };
-
-netMQPoller.RunAsync();
-NetMQMonitor monitor = new NetMQMonitor(subscriberSocket, $"inproc://addr:1234", SocketEvents.All);
-
-monitor.Connected += _monitor_Connected;
-monitor.Disconnected += _monitor_Disconected;
-```
+![Communication](./images/push-pull.png)
 
 ## Модель взаимодействия
 
-1. Передача и получение трафика производятся с использованием [ZeroMQ](https://zeromq.org/) по протоколу **Pub/Sub**  
+1. Передача и получение трафика производятся с использованием [ZeroMQ](https://zeromq.org/) по протоколу **Push/Pull**  
 2. Сериализация и десериализация сообщений производится с использованием [MessagePack](https://msgpack.org/)  
 3. Общая DTO-модель 
 

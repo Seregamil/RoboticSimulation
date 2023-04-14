@@ -4,7 +4,7 @@
         <TargetFramework>net7.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <UserSecretsId>dotnet-RobotNode-B589FDD5-ACC8-4820-90C3-0C63DE59B85E</UserSecretsId>
+        <UserSecretsId>dotnet-DemoPusher-F98C67AD-304C-4542-80E9-1B280DA1E72A</UserSecretsId>
     </PropertyGroup>
 
     <ItemGroup>
