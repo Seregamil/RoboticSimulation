@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RobotNode", "RobotNode\RobotNode.csproj", "{F8E5F35A-C492-4F33-8B94-8B7864B178AE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DomainLibrary", "DomainLibrary\DomainLibrary.csproj", "{CD66A454-122B-4CD5-B1E0-A82EC89943D7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F8E5F35A-C492-4F33-8B94-8B7864B178AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F8E5F35A-C492-4F33-8B94-8B7864B178AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F8E5F35A-C492-4F33-8B94-8B7864B178AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F8E5F35A-C492-4F33-8B94-8B7864B178AE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CD66A454-122B-4CD5-B1E0-A82EC89943D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CD66A454-122B-4CD5-B1E0-A82EC89943D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CD66A454-122B-4CD5-B1E0-A82EC89943D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CD66A454-122B-4CD5-B1E0-A82EC89943D7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
