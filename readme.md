@@ -3,9 +3,15 @@
 Управление роботом производится мобильного устройства  посредством использования гироскопа (в текущей реализации телефон на Android (Redmi 9))
 
 ```csharp 
-(float X, float Y) GyroscropeToJoysticConversion(float x, float y) {
+Vector2 GyroscopeToJoystickConversion(Vector2 gyroPos) {
     // x from -1.0 - 0.5 - 1.0
     // X from 0 - 511 - 1023
+    const float joyZeroEmulation = 511.0f; 
+
+    var x = joyZeroEmulation * gyroPos.X + (gyroPos.X > 0 ? gyroPos.X : -gyroPos.X);
+    var y = joyZeroEmulation * gyroPos.Y + (gyroPos.Y > 0 ? gyroPos.Y : -gyroPos.Y);
+
+    return new Vector2(x, y);
 }
 ```
 ___
@@ -41,9 +47,18 @@ monitor.Disconnected += _monitor_Disconected;
 
 ```csharp
 public class TransportDto {
+    public Vector2 Vector2 { get; set; }
+    public string PressedKeys { get; set; }
+}
+
+public class Vector2 {
     public float X { get; set; }
     public float Y { get; set; }
-    public string PressedKeys { get; set; }
+
+    public Vector2(float x, float y) {
+        X = x;
+        Y = y;
+    }
 }
 ```
 > **X** - Координаты смещения по X-оси (поворот).  
