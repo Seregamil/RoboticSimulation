@@ -19,4 +19,14 @@ public class TransportDto
         var serialized = MessagePackSerializer.Serialize(this);
         return serialized;
     }
+    
+    public void GyroscopeToJoystickConversion() {
+        const float joyZeroEmulation = 511.5f; 
+
+        var x = joyZeroEmulation * Vector2.X + (Vector2.X > 0 ? Vector2.X : -Vector2.X);
+        var y = joyZeroEmulation * Vector2.Y + (Vector2.Y > 0 ? Vector2.Y : -Vector2.Y);
+
+        Vector2.X = x;
+        Vector2.Y = y;
+    }
 }

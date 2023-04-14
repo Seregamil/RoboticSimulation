@@ -15,6 +15,8 @@ public class Worker : BackgroundService
     private readonly NetMQPoller _mqPoller;
     private readonly NetMQMonitor _mqMonitor;
 
+    private const bool NeedGyroscopeToJoystickConversion = true;
+
     public Worker(ILogger<Worker> logger, 
         IConfiguration configuration)
     {
@@ -48,6 +50,10 @@ public class Worker : BackgroundService
     {
         var random = new Random();
         var data = new TransportDto(new Vector2(random.NextSingle(), random.NextSingle()), "Q|E|R");
+        
+        if(NeedGyroscopeToJoystickConversion)
+            data.GyroscopeToJoystickConversion(); 
+        
         var serialized = data.Serialize();
         var json = MessagePackSerializer.ConvertToJson(serialized);
                     
