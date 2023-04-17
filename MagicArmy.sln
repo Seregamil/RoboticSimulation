@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DomainLibrary", "DomainLibr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DemoPusher", "DemoPusher\DemoPusher.csproj", "{49E93E48-5A8D-4912-8A4E-ACE103CD9847}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Platform", "Platform\Platform.csproj", "{6E076A2E-CA47-4265-9CC2-6A921A4C0C3B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{49E93E48-5A8D-4912-8A4E-ACE103CD9847}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{49E93E48-5A8D-4912-8A4E-ACE103CD9847}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{49E93E48-5A8D-4912-8A4E-ACE103CD9847}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E076A2E-CA47-4265-9CC2-6A921A4C0C3B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E076A2E-CA47-4265-9CC2-6A921A4C0C3B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E076A2E-CA47-4265-9CC2-6A921A4C0C3B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E076A2E-CA47-4265-9CC2-6A921A4C0C3B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

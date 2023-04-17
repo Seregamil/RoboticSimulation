@@ -14,5 +14,10 @@
 
     <ItemGroup>
       <ProjectReference Include="..\DomainLibrary\DomainLibrary.csproj" />
+      <ProjectReference Include="..\Platform\Platform.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Actions" />
     </ItemGroup>
 </Project>

@@ -25,10 +25,7 @@ public class Worker : BackgroundService
         
         var pushAddress = configuration.GetValue<string?>("Configuration:PushAddress") ?? throw new Exception("Can't get PushAddress");
         _pushSocket = new PushSocket(pushAddress);
-        _mqPoller = new NetMQPoller
-        {
-            _pushSocket 
-        };
+        _mqPoller = new NetMQPoller{ _pushSocket };
         
         _mqMonitor = new NetMQMonitor(_pushSocket, $"inproc://{pushAddress}", SocketEvents.All);
         _mqMonitor.AttachToPoller(_mqPoller);
@@ -43,6 +40,16 @@ public class Worker : BackgroundService
         {
             _logger.LogCritical("Disconnected from {socket}", args.Address);
             _pushSocket.SendReady -= PushSocketOnSendReady;
+        };
+        
+        _mqMonitor.AcceptFailed += (sender, args) =>
+        {
+            _logger.LogCritical("Cant accept {}; Err: {}", args.Address, args.ErrorCode);
+        };
+
+        _mqMonitor.ConnectRetried += (sender, args) =>
+        {
+            _logger.LogWarning("Connection retried: {}", args.Address);
         };
     }
 
