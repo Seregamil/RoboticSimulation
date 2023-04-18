@@ -13,4 +13,7 @@ public interface IBot
     void OnAcceptFailed(object? sender, NetMQMonitorErrorEventArgs e);
     void OnDisconnected(object? sender, NetMQMonitorSocketEventArgs e);
     void OnReceiveReady(object? sender, NetMQSocketEventArgs e);
+
+    bool RegisterSensor(ISensor sensor);
+    bool UnregisterSensor(long sensorId);
 }

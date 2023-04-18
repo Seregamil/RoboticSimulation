@@ -4,6 +4,7 @@ using NetMQ;
 using NetMQ.Monitoring;
 using NetMQ.Sockets;
 using Platform.Interfaces;
+using Platform.Sensors;
 
 namespace Platform;
 
@@ -18,12 +19,26 @@ public class Robot : IBot, IDisposable
     private readonly NetMQMonitor _mqMonitor;
     private readonly NetMQPoller _mqPoller;
     private readonly Task _pollerTask;
+
+    public delegate void SensorRegistered(ISensor sensor);
+    public delegate void SensorDisposed(ISensor sensor);
+    public delegate void KeyUp(string keyName);
+    public delegate void KeyDown(string keyName);
     
+    public event SensorRegistered OnSensorRegistered;
+    public event SensorDisposed OnSensorDisposed;
+    public event KeyUp OnKeyUp;
+    public event KeyDown OnKeyDown;
+    
+    
+    private readonly List<ISensor> _sensors = new ();
+    private readonly List<string> _pressedKeyList = new ();
+
     public Robot(Guid guid, string name, int pullPort)
     {
         _robotGuid = guid;
         _robotName = name;
-
+        
         _pullSocket = new PullSocket($"@tcp://localhost:{pullPort}");
         
         _mqPoller = new NetMQPoller { _pullSocket };
@@ -36,12 +51,34 @@ public class Robot : IBot, IDisposable
 
         _pollerTask = Task.Factory.StartNew(() => _mqPoller.RunAsync());
         
-        _blackbox = new Blackbox(_robotGuid, _robotName);
+        _blackbox = new Blackbox(this);
     }
 
+    public List<ISensor> GetSensors() => _sensors;
+    public Guid GetId() => _robotGuid;
+    public string GetName() => _robotName;
+    
     public void TransformAction(TransportDto transportDto)
     {
-        throw new NotImplementedException();
+        // Key event registration
+        var nonRegisteredKeysStrings = transportDto.PressedKeys
+            .Split('|')
+            .ToList();
+        
+        var nonRegisteredKeys = nonRegisteredKeysStrings.Except(_pressedKeyList).ToList();
+        var nonUnregisteredKeys = _pressedKeyList.Except(nonRegisteredKeysStrings).ToList(); 
+        
+        nonRegisteredKeys.ForEach(x =>
+        {
+            _pressedKeyList.Add(x);
+            OnKeyDown.Invoke(x);
+        });
+        
+        nonUnregisteredKeys.ForEach(x =>
+        {
+            _pressedKeyList.Remove(x);
+            OnKeyUp.Invoke(x);
+        });
     }
 
     public void SendDataFrame(FrameType frameType)
@@ -66,10 +103,15 @@ public class Robot : IBot, IDisposable
 
     public void OnReceiveReady(object? sender, NetMQSocketEventArgs e)
     {
+        // get received bytes
         var receiveBytes = e.Socket.ReceiveFrameBytes();
+        
+        // TODO: Remove. Its for debug
         var json = MessagePackSerializer.ConvertToJson(receiveBytes);
 
-        TransportDto model;
+        TransportDto? model = null;
+        
+        // try deserialize DTO model by messagepack
         try
         {
             model = MessagePackSerializer.Deserialize<TransportDto>(receiveBytes);
@@ -81,6 +123,32 @@ public class Robot : IBot, IDisposable
                 receiveBytes.Length,
                 err.Message);
         }
+        
+        // Check for model is null
+        if(model is null)
+            return;
+        
+        TransformAction(model);
+    }
+
+    public bool RegisterSensor(ISensor sensor)
+    {
+        _sensors.Add(sensor);
+        
+        OnSensorRegistered.Invoke(sensor);
+        return true;
+    }
+
+    public bool UnregisterSensor(long sensorId)
+    {
+        var sensor = _sensors.FirstOrDefault(x => x.GetId() == sensorId);
+        if (sensor is null)
+            return false;
+
+        _sensors.Remove(sensor);
+        
+        OnSensorDisposed.Invoke(sensor);
+        return true;
     }
 
     public void Dispose()
