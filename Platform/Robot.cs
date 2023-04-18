@@ -1,37 +1,33 @@
-﻿using DomainLibrary;
+﻿using AsyncIO;
+using DomainLibrary;
 using MessagePack;
 using NetMQ;
 using NetMQ.Monitoring;
 using NetMQ.Sockets;
 using Platform.Interfaces;
-using Platform.Sensors;
 
 namespace Platform;
 
-public class Robot : IBot, IDisposable
+public class Robot
 {
-    private readonly Blackbox _blackbox;
-
     private readonly Guid _robotGuid;
     private readonly string _robotName;
 
     private readonly PullSocket _pullSocket;
-    private readonly NetMQMonitor _mqMonitor;
-    private readonly NetMQPoller _mqPoller;
-    private readonly Task _pollerTask;
-
-    public delegate void SensorRegistered(ISensor sensor);
-    public delegate void SensorDisposed(ISensor sensor);
+    
     public delegate void KeyUp(string keyName);
     public delegate void KeyDown(string keyName);
+    public delegate void JoystickUsed(Vector2 vector2);
+    public delegate void ProducerConnected(AsyncSocket socket);
+    public delegate void ProducesDisconnected();
     
-    public event SensorRegistered OnSensorRegistered;
-    public event SensorDisposed OnSensorDisposed;
-    public event KeyUp OnKeyUp;
-    public event KeyDown OnKeyDown;
+    public event KeyUp? OnKeyUp;
+    public event KeyDown? OnKeyDown;
+    public event JoystickUsed? OnJoystickUsed;
+    public event ProducerConnected? OnProducerConnected;
+    public event ProducesDisconnected? OnProducerDisconnected;
     
     
-    private readonly List<ISensor> _sensors = new ();
     private readonly List<string> _pressedKeyList = new ();
 
     public Robot(Guid guid, string name, int pullPort)
@@ -41,121 +37,83 @@ public class Robot : IBot, IDisposable
         
         _pullSocket = new PullSocket($"@tcp://localhost:{pullPort}");
         
-        _mqPoller = new NetMQPoller { _pullSocket };
-        _mqMonitor = new NetMQMonitor(_pullSocket, $"inproc://localhost:{pullPort}", SocketEvents.All);
-        _mqMonitor.AttachToPoller(_mqPoller);
+        var mqPoller = new NetMQPoller { _pullSocket };
+        var mqMonitor = new NetMQMonitor(_pullSocket, $"inproc://localhost:{pullPort}", SocketEvents.All);
+        mqMonitor.AttachToPoller(mqPoller);
 
-        _mqMonitor.Accepted += OnAcceptedHost;
-        _mqMonitor.Disconnected += OnDisconnected;
-        _mqMonitor.AcceptFailed += OnAcceptFailed;
+        mqMonitor.Accepted += OnAcceptedHost;
+        mqMonitor.Disconnected += OnDisconnected;
 
-        _pollerTask = Task.Factory.StartNew(() => _mqPoller.RunAsync());
-        
-        _blackbox = new Blackbox(this);
+        _ = Task.Factory.StartNew(() => mqPoller.RunAsync());
     }
 
-    public List<ISensor> GetSensors() => _sensors;
     public Guid GetId() => _robotGuid;
     public string GetName() => _robotName;
-    
-    public void TransformAction(TransportDto transportDto)
+    public IEnumerable<string> GetPressedKeys() => _pressedKeyList;
+
+    private void TranslateMessageToActions(TransportDto transportDto)
     {
         // Key event registration
         var nonRegisteredKeysStrings = transportDto.PressedKeys
             .Split('|')
             .ToList();
         
-        var nonRegisteredKeys = nonRegisteredKeysStrings.Except(_pressedKeyList).ToList();
-        var nonUnregisteredKeys = _pressedKeyList.Except(nonRegisteredKeysStrings).ToList(); 
-        
-        nonRegisteredKeys.ForEach(x =>
+        // Register key press action
+        nonRegisteredKeysStrings.Except(_pressedKeyList)
+            .ToList()
+            .ForEach(x =>
         {
             _pressedKeyList.Add(x);
-            OnKeyDown.Invoke(x);
+            OnKeyDown?.Invoke(x);
         });
         
-        nonUnregisteredKeys.ForEach(x =>
+        // Regsiter key up action
+        _pressedKeyList.Except(nonRegisteredKeysStrings)
+            .ToList()
+            .ForEach(x =>
         {
             _pressedKeyList.Remove(x);
-            OnKeyUp.Invoke(x);
+            OnKeyUp?.Invoke(x);
         });
+        
+        OnJoystickUsed?.Invoke(transportDto.Vector2);
     }
 
-    public void SendDataFrame(FrameType frameType)
+    private void OnAcceptedHost(object? sender, NetMQMonitorSocketEventArgs e)
     {
-        throw new NotImplementedException();
-    }
-
-    public void OnAcceptedHost(object? sender, NetMQMonitorSocketEventArgs e)
-    {
+        if (e.Socket != null) 
+            OnProducerConnected?.Invoke(e.Socket);
+        
         _pullSocket.ReceiveReady += OnReceiveReady;
     }
 
-    public void OnAcceptFailed(object? sender, NetMQMonitorErrorEventArgs e)
-    {
-        throw new NotImplementedException();
-    }
-
-    public void OnDisconnected(object? sender, NetMQMonitorSocketEventArgs e)
+    private void OnDisconnected(object? sender, NetMQMonitorSocketEventArgs e)
     {
         _pullSocket.ReceiveReady -= OnReceiveReady;
+        _pressedKeyList.Clear();
+
+        OnProducerDisconnected?.Invoke();
     }
 
-    public void OnReceiveReady(object? sender, NetMQSocketEventArgs e)
+    private void OnReceiveReady(object? sender, NetMQSocketEventArgs e)
     {
         // get received bytes
         var receiveBytes = e.Socket.ReceiveFrameBytes();
         
-        // TODO: Remove. Its for debug
-        var json = MessagePackSerializer.ConvertToJson(receiveBytes);
-
-        TransportDto? model = null;
+        TransportDto model;
         
         // try deserialize DTO model by messagepack
         try
         {
             model = MessagePackSerializer.Deserialize<TransportDto>(receiveBytes);
-            Console.WriteLine("Message {0} bytes: {1}", json, receiveBytes.Length);
         }
         catch (MessagePackSerializationException err)
         {
-            Console.WriteLine("Deserialization error; message: {0} len: {1} error: {2}", json, 
-                receiveBytes.Length,
-                err.Message);
-        }
-        
-        // Check for model is null
-        if(model is null)
+            var json = MessagePackSerializer.ConvertToJson(receiveBytes);
+            Console.WriteLine($"[{DateTime.Now}] Received message: {json}; Deserialization error: {err.Message}");
             return;
-        
-        TransformAction(model);
-    }
+        }
 
-    public bool RegisterSensor(ISensor sensor)
-    {
-        _sensors.Add(sensor);
-        
-        OnSensorRegistered.Invoke(sensor);
-        return true;
-    }
-
-    public bool UnregisterSensor(long sensorId)
-    {
-        var sensor = _sensors.FirstOrDefault(x => x.GetId() == sensorId);
-        if (sensor is null)
-            return false;
-
-        _sensors.Remove(sensor);
-        
-        OnSensorDisposed.Invoke(sensor);
-        return true;
-    }
-
-    public void Dispose()
-    {
-        _pollerTask.Dispose();
-        _pullSocket.Dispose();
-        _mqMonitor.Dispose();
-        _mqPoller.Dispose();
+        TranslateMessageToActions(model);
     }
 }

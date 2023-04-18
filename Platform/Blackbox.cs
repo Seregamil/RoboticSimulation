@@ -40,7 +40,7 @@ public class Blackbox
     {
         while (_collectorEnabled)
         {
-            _robot.GetSensors()
+            /*_robot.GetSensors()
                 .Where(sensor => sensor.IsAvailable() && sensor.IsCollectable())
                 .ToList()
                 .ForEach(sensor =>
@@ -48,7 +48,7 @@ public class Blackbox
                     // TODO: Save data into another storage (maby sqlite?)
                     // Console.WriteLine($"Robot {_robot.GetId()}:{_robot.GetName()}; Sensor: {sensor.GetInfo()}");
                 });
-  
+  */
             Thread.Sleep(900);
         }
     }
