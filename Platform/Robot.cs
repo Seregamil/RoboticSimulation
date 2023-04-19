@@ -52,12 +52,10 @@ public class Robot
     /// <param name="name">Robot name. Maby non-unique</param>
     /// <param name="pullPort">Port for starting Pull-socket listener</param>
     /// <param name="logger">Logger reference. Optional parameter Maby null.</param>
-    /// <param name="runOnMainThread">If true, socket poller start on main thread of app</param>
     public Robot(Guid guid, 
         string name, 
         int pullPort, 
-        Logger? logger = null, 
-        bool runOnMainThread = true)
+        Logger? logger = null)
     {
         if (logger is not null)
             _logger = logger;
@@ -74,18 +72,8 @@ public class Robot
         mqMonitor.Accepted += OnAcceptedHost;
         mqMonitor.Disconnected += OnDisconnected;
 
-        if (runOnMainThread)
-        {
-            mqPoller.RunAsync();
-        }
-        else
-        {
-            Task.Factory.StartNew(() => mqPoller.RunAsync());
-        }
-
-        var thread = runOnMainThread ? "main" : "other";
+        mqPoller.RunAsync();
         
-        _logger?.Debug($"<Platform::Constructor>: Started listener on {thread} thread");
         _logger?.Information($"<Platform::Constructor>: Robot {GetName()}:{GetId()} successfully deployed");
     }
 
@@ -106,38 +94,6 @@ public class Robot
     /// </summary>
     /// <returns>IEnumerable values of pressed user keys</returns>
     public IEnumerable<string> GetPressedKeys() => _pressedKeyList;
-
-    /// <summary>
-    /// Method for translating DTO-model to bot-actions
-    /// </summary>
-    /// <param name="transportDto">See DomainLibrary.TransportDto</param>
-    private void TranslateMessageToActions(TransportDto transportDto)
-    {
-        // Key event registration
-        var nonRegisteredKeysStrings = transportDto.PressedKeys
-            .Split('|')
-            .ToList();
-        
-        // Register key press action
-        nonRegisteredKeysStrings.Except(_pressedKeyList)
-            .ToList()
-            .ForEach(x =>
-        {
-            _pressedKeyList.Add(x);
-            OnKeyDown?.Invoke(x);
-        });
-        
-        // Regsiter key up action
-        _pressedKeyList.Except(nonRegisteredKeysStrings)
-            .ToList()
-            .ForEach(x =>
-        {
-            _pressedKeyList.Remove(x);
-            OnKeyUp?.Invoke(x);
-        });
-        
-        OnJoystickUsed?.Invoke(transportDto.Vector2);
-    }
 
     /// <summary>
     /// Event called when producer connected to consumer and host successfully accepted
@@ -174,7 +130,21 @@ public class Robot
     /// <param name="e"></param>
     private void OnReceiveReady(object? sender, NetMQSocketEventArgs e)
     {
-        var receiveBytes = e.Socket.ReceiveFrameBytes();
+        _logger?.Debug($"<Platform::OnReceiveReady>: Started listener");
+        
+        var messageStatus = e.Socket.TryReceiveFrameBytes(out var receiveBytes);
+        if (!messageStatus)
+        {
+            _logger?.Error("<Platform::OnReceiveReady>: Can't receive message.");
+            return;
+        }
+
+        if (receiveBytes is null)
+        {
+            _logger?.Error("<Platform::OnReceiveReady>: Received null bytes.");
+            return;
+        }
+
         var json = MessagePackSerializer.ConvertToJson(receiveBytes);
 
         TransportDto model;
@@ -190,6 +160,29 @@ public class Robot
             return;
         }
 
-        TranslateMessageToActions(model);
+        // Key event registration
+        var nonRegisteredKeysStrings = model.PressedKeys
+            .Split('|')
+            .ToList();
+        
+        // Register key press action
+        nonRegisteredKeysStrings.Except(_pressedKeyList)
+            .ToList()
+            .ForEach(x =>
+            {
+                _pressedKeyList.Add(x);
+                OnKeyDown?.Invoke(x);
+            });
+        
+        // Regsiter key up action
+        _pressedKeyList.Except(nonRegisteredKeysStrings)
+            .ToList()
+            .ForEach(x =>
+            {
+                _pressedKeyList.Remove(x);
+                OnKeyUp?.Invoke(x);
+            });
+        
+        OnJoystickUsed?.Invoke(model.Vector2);
     }
 }

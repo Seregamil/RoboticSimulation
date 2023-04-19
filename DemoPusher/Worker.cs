@@ -10,11 +10,9 @@ namespace DemoPusher;
 public class Worker : BackgroundService
 {
     private readonly ILogger<Worker> _logger;
-    private readonly IConfiguration _configuration;
     
     private readonly PushSocket _pushSocket;
     private readonly NetMQPoller _mqPoller;
-    private readonly NetMQMonitor _mqMonitor;
 
     private const bool NeedGyroscopeToJoystickConversion = true;
 
@@ -22,33 +20,32 @@ public class Worker : BackgroundService
         IConfiguration configuration)
     {
         _logger = logger;
-        _configuration = configuration;
         
         var pushAddress = configuration.GetValue<string?>("Configuration:PushAddress") ?? throw new Exception("Can't get PushAddress");
         _pushSocket = new PushSocket(pushAddress);
         _mqPoller = new NetMQPoller{ _pushSocket };
         
-        _mqMonitor = new NetMQMonitor(_pushSocket, $"inproc://{pushAddress}", SocketEvents.All);
-        _mqMonitor.AttachToPoller(_mqPoller);
+        var mqMonitor = new NetMQMonitor(_pushSocket, $"inproc://{pushAddress}", SocketEvents.All);
+        mqMonitor.AttachToPoller(_mqPoller);
         
-        _mqMonitor.Connected += (sender, args) =>
+        mqMonitor.Connected += (_, args) =>
         {
             _logger.LogInformation("Successfully connected to {socket}", args.Address);
             _pushSocket.SendReady += PushSocketOnSendReady;
         };
         
-        _mqMonitor.Disconnected += (sender, args) =>
+        mqMonitor.Disconnected += (_, args) =>
         {
             _logger.LogCritical("Disconnected from {socket}", args.Address);
             _pushSocket.SendReady -= PushSocketOnSendReady;
         };
         
-        _mqMonitor.AcceptFailed += (sender, args) =>
+        mqMonitor.AcceptFailed += (_, args) =>
         {
             _logger.LogCritical("Cant accept {}; Err: {}", args.Address, args.ErrorCode);
         };
 
-        _mqMonitor.ConnectRetried += (sender, args) =>
+        mqMonitor.ConnectRetried += (_, args) =>
         {
             _logger.LogWarning("Connection retried: {}", args.Address);
         };

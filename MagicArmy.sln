@@ -1,10 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DemoPusher", "DemoPusher\DemoPusher.csproj", "{49E93E48-5A8D-4912-8A4E-ACE103CD9847}"
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33530.505
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DemoPusher", "DemoPusher\DemoPusher.csproj", "{49E93E48-5A8D-4912-8A4E-ACE103CD9847}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Platform", "Platform\Platform.csproj", "{6E076A2E-CA47-4265-9CC2-6A921A4C0C3B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Platform", "Platform\Platform.csproj", "{6E076A2E-CA47-4265-9CC2-6A921A4C0C3B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoboNode", "RoboNode\RoboNode.csproj", "{B91145D0-D6C2-4B12-8EBC-4BD95DAAB536}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RoboNode", "RoboNode\RoboNode.csproj", "{B91145D0-D6C2-4B12-8EBC-4BD95DAAB536}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoboController", "RoboController\RoboController.csproj", "{67F4ABEE-A7FE-4974-A762-11E5BCCF29C1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -24,5 +29,14 @@ Global
 		{B91145D0-D6C2-4B12-8EBC-4BD95DAAB536}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B91145D0-D6C2-4B12-8EBC-4BD95DAAB536}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B91145D0-D6C2-4B12-8EBC-4BD95DAAB536}.Release|Any CPU.Build.0 = Release|Any CPU
+		{67F4ABEE-A7FE-4974-A762-11E5BCCF29C1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{67F4ABEE-A7FE-4974-A762-11E5BCCF29C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{67F4ABEE-A7FE-4974-A762-11E5BCCF29C1}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{67F4ABEE-A7FE-4974-A762-11E5BCCF29C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{67F4ABEE-A7FE-4974-A762-11E5BCCF29C1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{67F4ABEE-A7FE-4974-A762-11E5BCCF29C1}.Release|Any CPU.Deploy.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 EndGlobal
