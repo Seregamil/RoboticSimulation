@@ -4,15 +4,30 @@ using MessagePack;
 using NetMQ;
 using NetMQ.Monitoring;
 using NetMQ.Sockets;
-using Platform.Interfaces;
+using Serilog.Core;
 
 namespace Platform;
 
 public class Robot
 {
+    /// <summary>
+    /// Unique robot UUID
+    /// </summary>
     private readonly Guid _robotGuid;
+    
+    /// <summary>
+    /// Robot name
+    /// </summary>
     private readonly string _robotName;
-
+    
+    /// <summary>
+    /// Reference variable for logger
+    /// </summary>
+    private readonly Logger? _logger;
+    
+    /// <summary>
+    /// Pull socket variable
+    /// </summary>
     private readonly PullSocket _pullSocket;
     
     public delegate void KeyUp(string keyName);
@@ -30,8 +45,23 @@ public class Robot
     
     private readonly List<string> _pressedKeyList = new ();
 
-    public Robot(Guid guid, string name, int pullPort)
+    /// <summary>
+    /// Constructor of robot platform
+    /// </summary>
+    /// <param name="guid">Unique robot UUID</param>
+    /// <param name="name">Robot name. Maby non-unique</param>
+    /// <param name="pullPort">Port for starting Pull-socket listener</param>
+    /// <param name="logger">Logger reference. Optional parameter Maby null.</param>
+    /// <param name="runOnMainThread">If true, socket poller start on main thread of app</param>
+    public Robot(Guid guid, 
+        string name, 
+        int pullPort, 
+        Logger? logger = null, 
+        bool runOnMainThread = true)
     {
+        if (logger is not null)
+            _logger = logger;
+        
         _robotGuid = guid;
         _robotName = name;
         
@@ -44,13 +74,43 @@ public class Robot
         mqMonitor.Accepted += OnAcceptedHost;
         mqMonitor.Disconnected += OnDisconnected;
 
-        _ = Task.Factory.StartNew(() => mqPoller.RunAsync());
+        if (runOnMainThread)
+        {
+            mqPoller.RunAsync();
+        }
+        else
+        {
+            Task.Factory.StartNew(() => mqPoller.RunAsync());
+        }
+
+        var thread = runOnMainThread ? "main" : "other";
+        
+        _logger?.Debug($"<Platform::Constructor>: Started listener on {thread} thread");
+        _logger?.Information($"<Platform::Constructor>: Robot {GetName()}:{GetId()} successfully deployed");
     }
 
+    /// <summary>
+    /// Use this for get robot unique uuid
+    /// </summary>
+    /// <returns>Return UUID formatted value</returns>
     public Guid GetId() => _robotGuid;
+    
+    /// <summary>
+    /// Use this for get robot name
+    /// </summary>
+    /// <returns>Return String value</returns>
     public string GetName() => _robotName;
+    
+    /// <summary>
+    /// Use for getting pressed keys by user. This list will be cleanup when producer disconnected
+    /// </summary>
+    /// <returns>IEnumerable values of pressed user keys</returns>
     public IEnumerable<string> GetPressedKeys() => _pressedKeyList;
 
+    /// <summary>
+    /// Method for translating DTO-model to bot-actions
+    /// </summary>
+    /// <param name="transportDto">See DomainLibrary.TransportDto</param>
     private void TranslateMessageToActions(TransportDto transportDto)
     {
         // Key event registration
@@ -79,38 +139,54 @@ public class Robot
         OnJoystickUsed?.Invoke(transportDto.Vector2);
     }
 
+    /// <summary>
+    /// Event called when producer connected to consumer and host successfully accepted
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
     private void OnAcceptedHost(object? sender, NetMQMonitorSocketEventArgs e)
     {
         if (e.Socket != null) 
             OnProducerConnected?.Invoke(e.Socket);
         
+        _logger?.Debug($"<Platform::OnAcceptedHost>: Accepted host! {e.Address}");
         _pullSocket.ReceiveReady += OnReceiveReady;
     }
 
+    /// <summary>
+    /// Event called when producer disconnected from consumer
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
     private void OnDisconnected(object? sender, NetMQMonitorSocketEventArgs e)
     {
         _pullSocket.ReceiveReady -= OnReceiveReady;
         _pressedKeyList.Clear();
 
+        _logger?.Debug($"<Platform::OnDisconnected>: Disconnected host! {e.Address}");
         OnProducerDisconnected?.Invoke();
     }
 
+    /// <summary>
+    /// Event who used for receiving messages from producer
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
     private void OnReceiveReady(object? sender, NetMQSocketEventArgs e)
     {
-        // get received bytes
         var receiveBytes = e.Socket.ReceiveFrameBytes();
-        
+        var json = MessagePackSerializer.ConvertToJson(receiveBytes);
+
         TransportDto model;
         
-        // try deserialize DTO model by messagepack
         try
         {
             model = MessagePackSerializer.Deserialize<TransportDto>(receiveBytes);
+            _logger?.Debug($"<Platform::OnReceiveReady>: Successfully received bytes array. Len: {receiveBytes.Length}; Message: {json}");
         }
         catch (MessagePackSerializationException err)
         {
-            var json = MessagePackSerializer.ConvertToJson(receiveBytes);
-            Console.WriteLine($"[{DateTime.Now}] Received message: {json}; Deserialization error: {err.Message}");
+            _logger?.Fatal($"<Platform::OnReceiveReady>: Message deserialization error! Message: {json}; Bytes: {receiveBytes.Length}; Error: {err.Message}");
             return;
         }
 
