@@ -1,8 +1,9 @@
-using DomainLibrary;
 using MessagePack;
 using NetMQ;
 using NetMQ.Monitoring;
 using NetMQ.Sockets;
+using Platform;
+using Platform.Models;
 
 namespace DemoPusher;
 

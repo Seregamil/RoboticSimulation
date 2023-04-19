@@ -1,6 +1,6 @@
 ﻿using MessagePack;
 
-namespace DomainLibrary;
+namespace Platform;
 
 [MessagePackObject(keyAsPropertyName: true)]
 public class Vector2

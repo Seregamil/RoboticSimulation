@@ -1,6 +1,6 @@
 ﻿using MessagePack;
 
-namespace DomainLibrary;
+namespace Platform.Models;
 
 [MessagePackObject(keyAsPropertyName: true)]
 public class TransportDto

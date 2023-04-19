@@ -12,7 +12,6 @@
     </PropertyGroup> -->
     
     <ItemGroup>
-      <ProjectReference Include="..\DomainLibrary\DomainLibrary.csproj" />
       <ProjectReference Include="..\Platform\Platform.csproj" />
     </ItemGroup>
     
