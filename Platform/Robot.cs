@@ -24,11 +24,11 @@ public class Robot
     /// Reference variable for logger
     /// </summary>
     private readonly Logger? _logger;
-    
+
     /// <summary>
     /// Pull socket variable
     /// </summary>
-    private readonly PullSocket _pullSocket;
+    private readonly NetMQSocket _socket;
     
     public delegate void KeyUp(string keyName);
     public delegate void KeyDown(string keyName);
@@ -63,10 +63,10 @@ public class Robot
         _robotGuid = guid;
         _robotName = name;
         
-        _pullSocket = new PullSocket($"@tcp://localhost:{pullPort}");
+        _socket = new PairSocket($"@tcp://localhost:{pullPort}");
         
-        var mqPoller = new NetMQPoller { _pullSocket };
-        var mqMonitor = new NetMQMonitor(_pullSocket, $"inproc://localhost:{pullPort}", SocketEvents.All);
+        var mqPoller = new NetMQPoller { _socket };
+        var mqMonitor = new NetMQMonitor(_socket, $"inproc://localhost:{pullPort}", SocketEvents.All);
         mqMonitor.AttachToPoller(mqPoller);
 
         mqMonitor.Accepted += OnAcceptedHost;
@@ -106,7 +106,7 @@ public class Robot
             OnProducerConnected?.Invoke(e.Socket);
         
         _logger?.Debug($"<Platform::OnAcceptedHost>: Accepted host! {e.Address}");
-        _pullSocket.ReceiveReady += OnReceiveReady;
+        _socket.ReceiveReady += OnReceiveReady;
     }
 
     /// <summary>
@@ -116,7 +116,7 @@ public class Robot
     /// <param name="e"></param>
     private void OnDisconnected(object? sender, NetMQMonitorSocketEventArgs e)
     {
-        _pullSocket.ReceiveReady -= OnReceiveReady;
+        _socket.ReceiveReady -= OnReceiveReady;
         _pressedKeyList.Clear();
 
         _logger?.Debug($"<Platform::OnDisconnected>: Disconnected host! {e.Address}");
@@ -146,12 +146,12 @@ public class Robot
         }
 
         var json = MessagePackSerializer.ConvertToJson(receiveBytes);
-
-        TransportDto model;
+        
+        InputControllerModel model;
         
         try
         {
-            model = MessagePackSerializer.Deserialize<TransportDto>(receiveBytes);
+            model = MessagePackSerializer.Deserialize<InputControllerModel>(receiveBytes);
             _logger?.Debug($"<Platform::OnReceiveReady>: Successfully received bytes array. Len: {receiveBytes.Length}; Message: {json}");
         }
         catch (MessagePackSerializationException err)
@@ -184,5 +184,16 @@ public class Robot
             });
         
         OnJoystickUsed?.Invoke(model.Vector2);
+    }
+
+    public void Send<T>(T model)
+    {
+        var serializedData = MessagePackSerializer.Serialize(model);
+        var json = MessagePackSerializer.ConvertToJson(serializedData);
+        
+        if(!_socket.TrySendFrame(serializedData))
+            _logger?.Error($"<Platform::Send>: Can't send {json}");
+        else
+            _logger?.Debug($"<Platform::Send>: Sended {json}");
     }
 }

@@ -11,7 +11,7 @@ public class Worker : BackgroundService
 {
     private readonly ILogger<Worker> _logger;
     
-    private readonly PushSocket _pushSocket;
+    private readonly NetMQSocket _socket;
     private readonly NetMQPoller _mqPoller;
 
     private const bool NeedGyroscopeToJoystickConversion = true;
@@ -22,22 +22,32 @@ public class Worker : BackgroundService
         _logger = logger;
         
         var pushAddress = configuration.GetValue<string?>("Configuration:PushAddress") ?? throw new Exception("Can't get PushAddress");
-        _pushSocket = new PushSocket(pushAddress);
-        _mqPoller = new NetMQPoller{ _pushSocket };
+        _socket = new PairSocket(pushAddress);
+        _mqPoller = new NetMQPoller{ _socket };
         
-        var mqMonitor = new NetMQMonitor(_pushSocket, $"inproc://{pushAddress}", SocketEvents.All);
+        var mqMonitor = new NetMQMonitor(_socket, $"inproc://{pushAddress}", SocketEvents.All);
         mqMonitor.AttachToPoller(_mqPoller);
         
         mqMonitor.Connected += (_, args) =>
         {
             _logger.LogInformation("Successfully connected to {socket}", args.Address);
-            _pushSocket.SendReady += PushSocketOnSendReady;
+            _socket.SendReady += PushSocketOnSendReady;
+            _socket.ReceiveReady += (sender, eventArgs) =>
+            {
+                while (true)
+                {
+                    if (!eventArgs.Socket.TryReceiveFrameBytes(out var data))
+                        return;
+
+                    _logger.LogInformation($"Received: {MessagePackSerializer.ConvertToJson(data)}");
+                }
+            };
         };
         
         mqMonitor.Disconnected += (_, args) =>
         {
             _logger.LogCritical("Disconnected from {socket}", args.Address);
-            _pushSocket.SendReady -= PushSocketOnSendReady;
+            _socket.SendReady -= PushSocketOnSendReady;
         };
         
         mqMonitor.AcceptFailed += (_, args) =>
@@ -54,7 +64,7 @@ public class Worker : BackgroundService
     private void PushSocketOnSendReady(object? sender, NetMQSocketEventArgs e)
     {
         var random = new Random();
-        var data = new TransportDto(new Vector2(random.NextSingle(), random.NextSingle()), "Q|E|R");
+        var data = new InputControllerModel(new Vector2(random.NextSingle(), random.NextSingle()), "Q|E|R");
         
         if(NeedGyroscopeToJoystickConversion)
             data.GyroscopeToJoystickConversion(); 
@@ -62,16 +72,14 @@ public class Worker : BackgroundService
         var serialized = data.Serialize();
         var json = MessagePackSerializer.ConvertToJson(serialized);
                     
-        if (_pushSocket.TrySendFrame(serialized))
+        if (_socket.TrySendFrame(serialized))
         {
-            _logger.LogInformation("Sended {message}", json);
+            // _logger.LogInformation("Sended {message}", json);
         }
         else
         {
-            _logger.LogCritical("Cant send {message}", json);
+            // _logger.LogCritical("Cant send {message}", json);
         }
-                    
-        Thread.Sleep(1000);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
