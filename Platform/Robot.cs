@@ -8,7 +8,7 @@ using Serilog.Core;
 
 namespace Platform;
 
-public class Robot
+public class Robot : IDisposable
 {
     /// <summary>
     /// Unique robot UUID
@@ -195,5 +195,10 @@ public class Robot
             _logger?.Error($"<Platform::Send>: Can't send {json}");
         else
             _logger?.Debug($"<Platform::Send>: Sended {json}");
+    }
+
+    public void Dispose()
+    {
+        _socket.Dispose();
     }
 }
