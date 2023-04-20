@@ -130,8 +130,6 @@ public class Robot : IDisposable
     /// <param name="e"></param>
     private void OnReceiveReady(object? sender, NetMQSocketEventArgs e)
     {
-        _logger?.Debug($"<Platform::OnReceiveReady>: Started listener");
-        
         var messageStatus = e.Socket.TryReceiveFrameBytes(out var receiveBytes);
         if (!messageStatus)
         {
