@@ -1,25 +1,32 @@
-using MessagePack;
 using NetMQ;
 using NetMQ.Monitoring;
 using NetMQ.Sockets;
 using Platform;
+using Platform.Extensions;
+using Platform.Identifies;
 using Platform.Models;
+using Serilog;
 
 namespace DemoPusher;
 
 public class Worker : BackgroundService
 {
-    private readonly ILogger<Worker> _logger;
-    
     private readonly NetMQSocket _socket;
     private readonly NetMQPoller _mqPoller;
 
+    private Identifier _identifier;
+    
     private const bool NeedGyroscopeToJoystickConversion = true;
 
-    public Worker(ILogger<Worker> logger, 
-        IConfiguration configuration)
+    public Worker(IConfiguration configuration)
     {
-        _logger = logger;
+        var model = new IdentifierModel()
+        {
+            Id = Guid.NewGuid(),
+            Name = "#zaebot"
+        };
+
+        _identifier = new ClientIdentifier(model);
         
         var pushAddress = configuration.GetValue<string?>("Configuration:PushAddress") ?? throw new Exception("Can't get PushAddress");
         _socket = new PairSocket(pushAddress);
@@ -30,56 +37,65 @@ public class Worker : BackgroundService
         
         mqMonitor.Connected += (_, args) =>
         {
-            _logger.LogInformation("Successfully connected to {socket}", args.Address);
-            _socket.SendReady += PushSocketOnSendReady;
+            Log.Information("Successfully connected to {socket}", args.Address);
+
+            _socket.SendReady += PushSocketOnSendReady;     
             _socket.ReceiveReady += (sender, eventArgs) =>
             {
-                while (true)
-                {
-                    if (!eventArgs.Socket.TryReceiveFrameBytes(out var data))
-                        return;
 
-                    _logger.LogInformation($"Received: {MessagePackSerializer.ConvertToJson(data)}");
-                }
             };
+        };
+
+        mqMonitor.Accepted += (_, args) =>
+        {
+            Log.Information("Accepted {host}", args.Address);
         };
         
         mqMonitor.Disconnected += (_, args) =>
         {
-            _logger.LogCritical("Disconnected from {socket}", args.Address);
+            Log.Error("Disconnected from {socket}", args.Address);
             _socket.SendReady -= PushSocketOnSendReady;
         };
         
         mqMonitor.AcceptFailed += (_, args) =>
         {
-            _logger.LogCritical("Cant accept {}; Err: {}", args.Address, args.ErrorCode);
+            Log.Error("Cant accept {}; Err: {}", args.Address, args.ErrorCode);
         };
 
         mqMonitor.ConnectRetried += (_, args) =>
         {
-            _logger.LogWarning("Connection retried: {}", args.Address);
+            Log.Warning("Connection retried: {}", args.Address);
         };
     }
 
     private void PushSocketOnSendReady(object? sender, NetMQSocketEventArgs e)
     {
-        var random = new Random();
-        var data = new InputControllerModel(new Vector2(random.NextSingle(), random.NextSingle()), "Q|E|R");
+        var message = MessagesExtension.Configure(_identifier, MessageType.Alert, 
+            new AlertModel()
+                {
+                    Message = "Help",
+                    Timestamp = DateTimeOffset.Now.ToUnixTimeSeconds()
+                });
         
-        if(NeedGyroscopeToJoystickConversion)
-            data.GyroscopeToJoystickConversion(); 
+        _socket.TrySendMultipartBytes(message);
+
+        var pressedList = Guid.NewGuid()
+            .ToString("N")[..8]
+            .ToUpper()
+            .Select(x => x);
         
-        var serialized = data.Serialize();
-        var json = MessagePackSerializer.ConvertToJson(serialized);
-                    
-        if (_socket.TrySendFrame(serialized))
-        {
-            // _logger.LogInformation("Sended {message}", json);
-        }
-        else
-        {
-            // _logger.LogCritical("Cant send {message}", json);
-        }
+        var pressed = string.Join('|', pressedList);
+        
+        message = MessagesExtension.Configure(_identifier, MessageType.Move, 
+            new MoveModel()
+                {
+                    Vector2 = new Vector2(0.2f, 0.1f),
+                    PressedKeys = pressed
+                });
+                
+        _socket.TrySendMultipartBytes(message);
+        
+        Thread.Sleep(5000);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

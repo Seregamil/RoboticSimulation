@@ -15,18 +15,18 @@ files.RemoveRange(0, numberOfDbToKeep);
 files.ForEach(x => x.Delete());
 
 // Configure logger
-var log = new LoggerConfiguration()
-    .MinimumLevel.Debug()
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Verbose()
     .WriteTo.LiteDB($"blackbox-{DateTimeOffset.Now.ToUnixTimeSeconds()}.db", "blackbox")
     .WriteTo.Console()
     .CreateLogger();
 
 // Configure platform
-var robot = new Robot(Guid.NewGuid(), "#botyanya", port, log);
+var robot = new Robot(Guid.NewGuid(), "#botyanya", port);
 
-robot.OnProducerConnected += socket => log.Information($"Connected producer {socket}");
-robot.OnProducerDisconnected += () => log.Warning("Producer disconnected");
+robot.OnProducerConnected += socket => Log.Debug($"Connected producer {socket}");
+robot.OnProducerDisconnected += () => Log.Debug("Producer disconnected");
         
-robot.OnKeyDown += name => log.Information($"Key DOWN: {name}");
-robot.OnKeyUp += name => log.Information($"Key UP: {name}");
-robot.OnJoystickUsed += vector => log.Information($"JoyX: {vector.X}; JoyY: {vector.Y}");
+robot.OnKeyDown += s => Log.Verbose("Key DOWN: {s}", s);
+robot.OnKeyUp += s => Log.Verbose("Key UP: {s}", s);
+robot.OnJoystickUsed += v => Log.Verbose("JoyX: {x}; JoyY: {y}", v.X, v.Y);
