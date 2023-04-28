@@ -1,6 +1,6 @@
 ﻿using MessagePack;
 
-namespace Platform;
+namespace Platform.Models;
 
 [MessagePackObject(keyAsPropertyName: true)]
 public class Vector2
