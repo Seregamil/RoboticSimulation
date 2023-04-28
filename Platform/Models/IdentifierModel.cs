@@ -17,4 +17,12 @@ public class IdentifierModel
     /// </summary>
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
+    
+    public IdentifierModel() {}
+
+    public IdentifierModel(Guid id, string name)
+    {
+        Id = id;
+        Name = name;
+    }
 }

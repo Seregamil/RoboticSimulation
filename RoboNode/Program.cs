@@ -22,7 +22,7 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 // Configure platform
-var robot = new Robot(Guid.NewGuid(), "#botyanya", port);
+var robot = new Robot(Guid.NewGuid(), "#botyanya",  $"@tcp://localhost:{port}");
 
 robot.OnProducerConnected += socket => Log.Debug($"Connected producer {socket}");
 robot.OnProducerDisconnected += () => Log.Debug("Producer disconnected");
