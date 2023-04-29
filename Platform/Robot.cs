@@ -1,6 +1,4 @@
-﻿using System.Text.Json;
-using AsyncIO;
-using NetMQ;
+﻿using AsyncIO;
 using NetMQ.Monitoring;
 using Platform.Handlers;
 using Platform.Identifies;
@@ -40,6 +38,8 @@ public class Robot : Entity
         _moveHandler.OnKeyDown += key => OnKeyDown?.Invoke(key);
         _moveHandler.OnVectorChanged += vector2 => OnJoystickUsed?.Invoke(vector2);
         
+        OnMessageReceived += OnMessageSuccessfullyReceived;
+        
         Socket.Monitor.Accepted += OnAcceptedHost;
         Socket.Monitor.Disconnected += OnDisconnected;
         
@@ -78,96 +78,27 @@ public class Robot : Entity
         _moveHandler.Clear();
         OnProducerDisconnected?.Invoke();
     }
-
+    
     /// <summary>
-    /// Event who used for receiving messages from producer
+    /// Called when message successfully received and deserialized
     /// </summary>
-    /// <param name="sender"></param>
-    /// <param name="e"></param>
-    protected override void OnReceiveReady(object? sender, NetMQSocketEventArgs e)
+    /// <param name="messageModel"></param>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
+    private void OnMessageSuccessfullyReceived(MessageModel messageModel)
     {
-        var message = new List<byte[]>();
-        var messageStatus = e.Socket.TryReceiveMultipartBytes(ref message);
-        if (!messageStatus)
-            return;
-                
-        /*
-         * 0 IdentifierModel
-         * 1 Empty frame
-         * 2 MessageType
-         * 3 Empty frame
-         * 4 Workload
-         * 5 Workload
-         * ...
-         * n Workload
-         */
-        
-        Log.Debug("Received multipart bytes message: {msg}", JsonSerializer.Serialize(message));
-        
-        // so, simple isAlive message will be have next format: 
-        // 0 IdentifierModel
-        // 1 EmptyFrame
-        // 2 MessageType.Healthckeck
-        if (message.Count < 3)
-        {
-            Log.Error("Not full message. Frames: {received}/3; Aborting", message.Count);
-            return;
-        }
+        ConnectedIdentifier = new ClientIdentifier(messageModel.IdentifierModel);        
 
-        // Check protocol. Second frame should me empty
-        if (message[1].Length > 0)
-        {
-            Log.Error("Not correct protocol. 2 frame should me empty. Frame len: {len}", message[1].Length);
+        if(messageModel.Messages.Count == 0)
             return;
-        }
-
-        var identifier = GetMessageIdentifierModel(message[0]);
-        var messageType = GetMessageType(message[2]);
-
-        if (identifier is null)
-        {
-            Log.Warning("Identifier is {val}. Aborting;", identifier);
-            return;
-        }
         
-        if (messageType is null)
+        messageModel.Messages.ForEach(message =>
         {
-            Log.Warning("Message type is {val}. Aborting;", messageType);
-            return;
-        }
-        
-        Log.Verbose("Message from client {id}; Type: {type}; ", 
-            identifier.Id, 
-            messageType);
-
-        // declare connected identifier
-        ConnectedIdentifier = new ClientIdentifier(identifier);        
-        
-        // 4 will be empty, 5+ - workload
-        if(message.Count is < 3 and < 5)
-            return;
-
-        if (message[3].Length > 0)
-        {
-            Log.Error("Not correct protocol. 4 frame should me empty. Frame len: {len}", message[3].Length);
-            return;
-        }
-        
-        for (var i = 4; i != message.Count; i++)
-        {
-            var workload = GetMessageWorkloadModel(messageType.Value, message[i]);
-            if (workload is null)
+            _ = messageModel.MessageType switch
             {
-                Log.Warning("Workload in frame {f}/{s} is null!", i, message.Count);
-                continue;
-            }
-
-            _ = messageType switch
-            {
-                MessageType.Move => _moveHandler.Update((MoveModel) workload),
+                MessageType.Move => _moveHandler.Update((MoveModel) message),
                 MessageType.Alert => true,
                 _ => throw new ArgumentOutOfRangeException()
             };
-        }
+        });
     }
 }

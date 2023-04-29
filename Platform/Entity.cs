@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NetMQ;
 using NetMQ.Monitoring;
 using Platform.Extensions;
@@ -14,6 +15,9 @@ public abstract class Entity
     protected Identifier? ConnectedIdentifier;
     
     protected readonly SocketExtension Socket;
+    
+    public delegate void MessageReceived(MessageModel messageModel);
+    public event MessageReceived? OnMessageReceived;
     
     protected Entity(Guid guid, string name, string address)
     {
@@ -116,9 +120,103 @@ public abstract class Entity
     /// </summary>
     /// <param name="sender"></param>
     /// <param name="e"></param>
-    protected virtual void OnReceiveReady(object? sender, NetMQSocketEventArgs e)
+    private void OnReceiveReady(object? sender, NetMQSocketEventArgs e)
     {
+        var messagesArray = new List<byte[]>();
+        var messageStatus = e.Socket.TryReceiveMultipartBytes(ref messagesArray);
+        if (!messageStatus)
+            return;
+
+        var message = DeconstructMessage(messagesArray);
+        if(message is null)
+            return;
         
+        OnMessageReceived?.Invoke(message);
+    }
+
+    private MessageModel? DeconstructMessage(List<byte[]> message)
+    {
+        /*
+         * 0 IdentifierModel
+         * 1 Empty frame
+         * 2 MessageType
+         * 3 Empty frame
+         * 4 Workload
+         * 5 Workload
+         * ...
+         * n Workload
+         */
+        var outputModel = new MessageModel();
+        
+        Log.Debug("Received multipart bytes message: {msg}", JsonSerializer.Serialize(message));
+        
+        // so, simple isAlive message will be have next format: 
+        // 0 IdentifierModel
+        // 1 EmptyFrame
+        // 2 MessageType.Healthckeck
+        if (message.Count < 3)
+        {
+            Log.Error("Not full message. Frames: {received}/3; Aborting", message.Count);
+            return null;
+        }
+
+        // Check protocol. Second frame should me empty
+        if (message[1].Length > 0)
+        {
+            Log.Error("Not correct protocol. 2 frame should me empty. Frame len: {len}", message[1].Length);
+            return null;
+        }
+
+        var identifier = GetMessageIdentifierModel(message[0]);
+        var messageType = GetMessageType(message[2]);
+
+        if (identifier is null)
+        {
+            Log.Warning("Identifier is {val}. Aborting;", identifier);
+            return null;
+        }
+        
+        if (messageType is null)
+        {
+            Log.Warning("Message type is {val}. Aborting;", messageType);
+            return null;
+        }
+
+        outputModel.IdentifierModel = identifier;
+        outputModel.MessageType = messageType.Value;
+        
+        Log.Verbose("Message from client {id}; Type: {type}; ", 
+            identifier.Id, 
+            messageType);
+
+        // declare connected identifier
+        // ConnectedIdentifier = new ClientIdentifier(identifier);        
+        
+        // 4 will be empty, 5+ - workload
+        if(message.Count is < 3 and < 5)
+            return outputModel;
+
+        if (message[3].Length > 0)
+        {
+            Log.Error("Not correct protocol. 4 frame should me empty. Frame len: {len}", message[3].Length);
+            return outputModel;
+        }
+
+        var workloads = new List<IMessage>();
+        for (var i = 4; i != message.Count; i++)
+        {
+            var workload = GetMessageWorkloadModel(messageType.Value, message[i]);
+            if (workload is null)
+            {
+                Log.Warning("Workload in frame {f}/{s} is null!", i, message.Count);
+                continue;
+            }
+            
+            workloads.Add(workload);
+        }
+
+        outputModel.Messages = workloads;
+        return outputModel;
     }
 
     public void Send<T>(MessageType type, T model)
