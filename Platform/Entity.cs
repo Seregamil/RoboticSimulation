@@ -23,7 +23,6 @@ public abstract class Entity
     {
         _identifier = new Identifier(new IdentifierModel(guid, name));
         Socket = new SocketExtension(address);
-        
         Socket.Run();
     }
     
