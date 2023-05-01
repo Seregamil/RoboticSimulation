@@ -26,7 +26,7 @@ var robot = new Robot(Guid.NewGuid(), "#botyanya",  $"@tcp://localhost:{port}");
 
 robot.OnProducerConnected += socket => Log.Debug($"Connected producer {socket}");
 robot.OnProducerDisconnected += () => Log.Debug("Producer disconnected");
-        
+
 robot.OnKeyDown += s => Log.Verbose("Key DOWN: {s}", s);
 robot.OnKeyUp += s => Log.Verbose("Key UP: {s}", s);
 robot.OnJoystickUsed += v => Log.Verbose("JoyX: {x}; JoyY: {y}", v.X, v.Y);

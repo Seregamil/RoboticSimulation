@@ -17,7 +17,10 @@ public abstract class Entity
     protected readonly SocketExtension Socket;
     
     public delegate void MessageReceived(MessageModel messageModel);
+    public delegate void SendReady();
+
     public event MessageReceived? OnMessageReceived;
+    public event SendReady? OnMessageSendReady;
     
     protected Entity(Guid guid, string name, string address)
     {
@@ -99,8 +102,19 @@ public abstract class Entity
             e.Socket.RemoteEndPoint.Port);
         
         Socket.Handle.ReceiveReady += OnReceiveReady;
+        Socket.Handle.SendReady += OnSendReady;
     }
-    
+
+    /// <summary>
+    /// Event called when entity ready for send message
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private void OnSendReady(object? sender, NetMQSocketEventArgs e)
+    {
+        OnMessageSendReady?.Invoke();
+    }
+
     /// <summary>
     /// Event called when producer disconnected from consumer
     /// </summary>
@@ -110,6 +124,7 @@ public abstract class Entity
     {
         Log.Verbose("<Platform::OnDisconnected>: Disconnected {id}", ConnectedIdentifier?.Id);
         Socket.Handle.ReceiveReady -= OnReceiveReady;
+        Socket.Handle.SendReady -= OnSendReady;
 
         ConnectedIdentifier = null;
     }
